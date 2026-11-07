@@ -25,6 +25,14 @@ function crearApp({ publicar = async () => {} } = {}) {
     };
     prestamos.push(prestamo);
     // TODO Tarea 2: publicar el evento PrestamoRegistrado con la clave prestamo.registrado
+    await publicar("prestamo.registrado", {
+      prestamoId: prestamo.id,
+      lector: prestamo.lector,
+      correo: prestamo.correo,
+      libro: prestamo.libro,
+      registradoEn: prestamo.registradoEn
+    });
+
     res.status(201).json(prestamo);
   });
 
