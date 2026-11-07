@@ -1,5 +1,6 @@
 const express = require("express");
 const { calcularMulta } = require("./multa");
+const { construirEventoPrestamoRegistrado } = require("./eventos");
 
 // publicar(clave, evento) se inyecta desde server.js: así las pruebas
 // pueden pasar una función falsa (jest.fn) sin necesitar el broker.
@@ -25,13 +26,18 @@ function crearApp({ publicar = async () => {} } = {}) {
     };
     prestamos.push(prestamo);
     // TODO Tarea 2: publicar el evento PrestamoRegistrado con la clave prestamo.registrado
-    await publicar("prestamo.registrado", {
+    //? punto anterior y abajo se termina remplazando
+    /* await publicar("prestamo.registrado", {
       prestamoId: prestamo.id,
       lector: prestamo.lector,
       correo: prestamo.correo,
       libro: prestamo.libro,
       registradoEn: prestamo.registradoEn
-    });
+    }); */
+
+    const evento = construirEventoPrestamoRegistrado(prestamo);
+
+    await publicar("prestamo.registrado", evento);
 
     res.status(201).json(prestamo);
   });
