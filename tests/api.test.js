@@ -46,3 +46,35 @@ describe("Pruebas de la API de prestamos", () => {
   });
 
 });
+
+
+describe("Pruebas de devolucion de prestamos", () => {
+
+  test("Devuelve un prestamo y calcula su multa", async () => {
+    const publicar = jest.fn().mockResolvedValue(true);
+    const app = crearApp({ publicar });
+
+    // Primero registramos el prestamo
+    const registro = await request(app)
+      .post("/prestamos")
+      .send({
+        lector: "Agustin",
+        correo: "agustin@correo.com",
+        libro: "Microservicios"
+      });
+
+    expect(registro.status).toBe(201);
+
+    // Despues registramos su devolucion
+    const respuesta = await request(app)
+      .post(`/prestamos/${registro.body.id}/devolucion`)
+      .send({
+        diasRetraso: 3
+      });
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.multa).toBe(6);
+    expect(respuesta.body.devuelto).toBe(true);
+  });
+
+});
