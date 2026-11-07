@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "jest --runInBand",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage --runInBand"
   },
   "dependencies": {
+    "amqplib": "^2.2.1",
     "express": "^4.21.2"
   },
   "devDependencies": {
