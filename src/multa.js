@@ -7,7 +7,7 @@ const TOPE = 50;
 
 function calcularMulta(diasRetraso, porDia = 2) {
   if (diasRetraso < 0) throw new Error("dias de retraso invalidos");
-  return diasRetraso * porDia;
+  return Math.min(diasRetraso * porDia, TOPE);
 }
 
 module.exports = { calcularMulta, TOPE };
