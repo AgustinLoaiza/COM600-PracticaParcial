@@ -8,33 +8,49 @@ async function iniciarConsumidor() {
     throw new Error("RABBITMQ_URL no esta definida");
   }
 
-  // 1. Conectar con RabbitMQ
   const conexion = await amqp.connect(URL);
   const canal = await conexion.createChannel();
 
-  // 2. Declarar exchange
+  // Exchange principal
   await canal.assertExchange("biblioteca", "topic", {
     durable: true
   });
 
-  // 3. Declarar cola durable
-  await canal.assertQueue("avisos.correo", {
+  // Exchange de mensajes muertos
+  await canal.assertExchange(
+    "biblioteca.muertos",
+    "fanout",
+    { durable: true }
+  );
+
+  // Cola de mensajes muertos
+  await canal.assertQueue("avisos.muertos", {
     durable: true
   });
 
-  // 4. Enlazar cola con exchange
+  // Enlazar la cola de muertos a su exchange
+  await canal.bindQueue(
+    "avisos.muertos",
+    "biblioteca.muertos",
+    ""
+  );
+
+  // Cola principal con DLQ
+  await canal.assertQueue("avisos.correo", {
+    durable: true,
+    deadLetterExchange: "biblioteca.muertos"
+  });
+
   await canal.bindQueue(
     "avisos.correo",
     "biblioteca",
     "prestamo.*"
   );
 
-  // 5. Un mensaje sin confirmar a la vez
   await canal.prefetch(1);
 
   console.log("[avisos] Esperando mensajes...");
 
-  // 6. Consumir mensajes
   await canal.consume(
     "avisos.correo",
     async (mensaje) => {
@@ -45,7 +61,22 @@ async function iniciarConsumidor() {
           mensaje.content.toString()
         );
 
-        // Simular envio del aviso
+        // Validar correo
+        if (
+          !evento.correo ||
+          !evento.correo.includes("@")
+        ) {
+          console.error(
+            "[avisos] Correo invalido:",
+            evento.correo
+          );
+
+          // Rechazar sin reencolar
+          canal.nack(mensaje, false, false);
+          return;
+        }
+
+        // Simular envio de correo
         console.log(
           `[avisos] Correo enviado a ${evento.correo}`
         );
@@ -54,7 +85,6 @@ async function iniciarConsumidor() {
           `[avisos] Prestamo: ${evento.prestamoId}`
         );
 
-        // Confirmar despues de procesar
         canal.ack(mensaje);
 
       } catch (error) {
