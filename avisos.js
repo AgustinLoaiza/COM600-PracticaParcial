@@ -1,6 +1,19 @@
 
 const amqp = require("amqplib");
 
+// Funcion para generar registros estructurados en JSON
+function registrar(nivel, mensaje, datos = {}) {
+  const registro = {
+    nivel,
+    time: new Date().toISOString(),
+    servicio: "avisos",
+    ...datos,
+    msg: mensaje
+  };
+
+  console.log(JSON.stringify(registro));
+}
+
 async function iniciarConsumidor() {
   const URL = process.env.RABBITMQ_URL;
 
@@ -8,91 +21,100 @@ async function iniciarConsumidor() {
     throw new Error("RABBITMQ_URL no esta definida");
   }
 
+  // 1. Conectar con RabbitMQ
   const conexion = await amqp.connect(URL);
   const canal = await conexion.createChannel();
 
-  // Exchange principal
+  // 2. Exchange principal
   await canal.assertExchange("biblioteca", "topic", {
     durable: true
   });
 
-  // Exchange de mensajes muertos
+  // 3. Exchange de mensajes muertos
   await canal.assertExchange(
     "biblioteca.muertos",
     "fanout",
     { durable: true }
   );
 
-  // Cola de mensajes muertos
+  // 4. Cola de mensajes muertos
   await canal.assertQueue("avisos.muertos", {
     durable: true
   });
 
-  // Enlazar la cola de muertos a su exchange
+  // 5. Enlazar la cola de muertos a su exchange
   await canal.bindQueue(
     "avisos.muertos",
     "biblioteca.muertos",
     ""
   );
 
-  // Cola principal con DLQ
+  // 6. Cola principal con DLQ
   await canal.assertQueue("avisos.correo", {
     durable: true,
     deadLetterExchange: "biblioteca.muertos"
   });
 
+  // 7. Enlazar cola principal al exchange
   await canal.bindQueue(
     "avisos.correo",
     "biblioteca",
     "prestamo.*"
   );
 
+  // 8. Procesar un mensaje sin confirmar a la vez
   await canal.prefetch(1);
 
-  console.log("[avisos] Esperando mensajes...");
+  registrar("info", "Esperando mensajes de RabbitMQ");
 
+  // 9. Consumir mensajes
   await canal.consume(
     "avisos.correo",
     async (mensaje) => {
       if (!mensaje) return;
 
+      let evento;
+
       try {
-        const evento = JSON.parse(
+        // Convertir el mensaje JSON en objeto
+        evento = JSON.parse(
           mensaje.content.toString()
         );
 
-        // Validar correo
+        // 10. Validar el correo
         if (
           !evento.correo ||
           !evento.correo.includes("@")
         ) {
-          console.error(
-            "[avisos] Correo invalido:",
-            evento.correo
-          );
+          registrar("error", "correo invalido", {
+            idCorrelacion: evento.idCorrelacion,
+            prestamoId: evento.prestamoId,
+            correo: evento.correo
+          });
 
-          // Rechazar sin reencolar
+          // Rechazar sin reencolar y enviar a DLQ
           canal.nack(mensaje, false, false);
           return;
         }
 
-        // Simular envio de correo
-        console.log(
-          `[avisos] Correo enviado a ${evento.correo}`
-        );
+        // 11. Simular envio del aviso por correo
+        registrar("info", "aviso procesado", {
+          idCorrelacion: evento.idCorrelacion,
+          prestamoId: evento.prestamoId,
+          correo: evento.correo
+        });
 
-        console.log(
-          `[avisos] Prestamo: ${evento.prestamoId}`
-        );
-
+        // 12. Confirmar despues de procesar
         canal.ack(mensaje);
 
       } catch (error) {
-        console.error(
-          "[avisos] Error:",
-          error.message
-        );
+        registrar("error", "error al procesar mensaje", {
+          idCorrelacion: evento?.idCorrelacion,
+          prestamoId: evento?.prestamoId,
+          error: error.message
+        });
 
+        // Rechazar mensaje sin reencolar
         canal.nack(mensaje, false, false);
       }
     },
@@ -100,7 +122,11 @@ async function iniciarConsumidor() {
   );
 }
 
+// Iniciar el consumidor
 iniciarConsumidor().catch((error) => {
-  console.error(error.message);
+  registrar("error", "no se pudo iniciar consumidor", {
+    error: error.message
+  });
+
   process.exit(1);
 });

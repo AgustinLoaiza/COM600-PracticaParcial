@@ -1,12 +1,32 @@
 const express = require("express");
 const { calcularMulta } = require("./multa");
 const { construirEventoPrestamoRegistrado } = require("./eventos");
+const { randomUUID } = require("crypto");
+const { registro } = require("./registro");
 
 // publicar(clave, evento) se inyecta desde server.js: así las pruebas
 // pueden pasar una función falsa (jest.fn) sin necesitar el broker.
 function crearApp({ publicar = async () => {} } = {}) {
   const app = express();
   app.use(express.json());
+  
+  app.use((req, res, next) => {
+    req.idCorrelacion =
+      req.get("x-correlation-id") || randomUUID();
+
+    res.set("x-correlation-id", req.idCorrelacion);
+
+    req.registro = registro.child({
+      idCorrelacion: req.idCorrelacion,
+      metodo: req.method,
+      ruta: req.path
+  });
+
+  req.registro.info("peticion recibida");
+
+  next();
+  });
+
   const prestamos = [];
 
   app.get("/salud", (_req, res) => res.json({ estado: "ok" }));
@@ -35,10 +55,17 @@ function crearApp({ publicar = async () => {} } = {}) {
       registradoEn: prestamo.registradoEn
     }); */
 
-    const evento = construirEventoPrestamoRegistrado(prestamo);
+    
+  const evento = construirEventoPrestamoRegistrado(prestamo);
 
-    await publicar("prestamo.registrado", evento);
+  evento.idCorrelacion = req.idCorrelacion;
 
+  await publicar("prestamo.registrado", evento);
+
+  req.registro.info(
+    { prestamoId: prestamo.id },
+    "prestamo registrado"
+  );
     res.status(201).json(prestamo);
   });
 
