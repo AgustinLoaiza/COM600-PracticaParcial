@@ -11,5 +11,14 @@ services:
     volumes:
       - rabbit_datos:/var/lib/rabbitmq
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   rabbit_datos:
