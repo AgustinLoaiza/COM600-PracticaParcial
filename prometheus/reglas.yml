@@ -1,0 +1,27 @@
+
+groups:
+  - name: alertas-prestamos
+    rules:
+      - alert: RechazosAltos
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_count{
+              metodo="POST",
+              ruta="/prestamos",
+              codigo=~"4.."
+            }[1m]))
+            /
+            clamp_min(
+              sum(rate(http_request_duration_seconds_count{
+                metodo="POST",
+                ruta="/prestamos"
+              }[1m])),
+              0.000001
+            )
+          ) > 0.20
+        for: 1m
+        labels:
+          severidad: critica
+        annotations:
+          resumen: "Mas del 20% de prestamos son rechazados"
+          accion: "Revisar los registros y solicitudes invalidas"

@@ -4,6 +4,12 @@ const { construirEventoPrestamoRegistrado } = require("./eventos");
 const { randomUUID } = require("crypto");
 const { registro } = require("./registro");
 
+const {
+  client,
+  duracionHTTP,
+  prestamosRegistrados
+} = require("./metricas");
+
 // publicar(clave, evento) se inyecta desde server.js: así las pruebas
 // pueden pasar una función falsa (jest.fn) sin necesitar el broker.
 function crearApp({ publicar = async () => {} } = {}) {
@@ -27,6 +33,23 @@ function crearApp({ publicar = async () => {} } = {}) {
   next();
   });
 
+  
+  // Middleware para medir duracion HTTP
+  app.use((req, res, next) => {
+    const finalizar = duracionHTTP.startTimer();
+
+    res.on("finish", () => {
+      finalizar({
+        metodo: req.method,
+        ruta: req.route ? req.route.path : "sin_ruta",
+        codigo: String(res.statusCode)
+      });
+    });
+
+    next();
+  });
+
+
   const prestamos = [];
 
   app.get("/salud", (_req, res) => res.json({ estado: "ok" }));
@@ -45,6 +68,7 @@ function crearApp({ publicar = async () => {} } = {}) {
       registradoEn: new Date().toISOString(),
     };
     prestamos.push(prestamo);
+    prestamosRegistrados.inc();
     // TODO Tarea 2: publicar el evento PrestamoRegistrado con la clave prestamo.registrado
     //? punto anterior y abajo se termina remplazando
     /* await publicar("prestamo.registrado", {
@@ -81,6 +105,13 @@ function crearApp({ publicar = async () => {} } = {}) {
       res.status(400).json({ error: e.message });
     }
   });
+
+  
+  app.get("/metrics", async (_req, res) => {
+    res.set("Content-Type", client.register.contentType);
+    res.end(await client.register.metrics());
+  });
+
 
   return app;
 }
