@@ -1,0 +1,53 @@
+
+name: CI - Segundo Parcial COM600
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+
+  # JOB 1: PRUEBAS AUTOMATIZADAS
+  pruebas:
+    name: Pruebas con Jest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar pruebas
+        run: npm test
+
+  # JOB 2: CALIDAD Y SEGURIDAD
+  calidad:
+    name: Auditoria de dependencias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Auditar dependencias
+        run: npm audit --audit-level=critical
