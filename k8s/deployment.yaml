@@ -1,0 +1,40 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prestamos-api
+  labels:
+    app: prestamos-api
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: prestamos-api
+  template:
+    metadata:
+      labels:
+        app: prestamos-api
+    spec:
+      containers:
+        - name: prestamos-api
+          image: prestamos-api:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+              - configMapRef:
+                  name: prestamos-config
+              - secretRef:
+                  name: prestamos-secret
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
